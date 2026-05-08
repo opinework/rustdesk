@@ -9,6 +9,7 @@ import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/common/widgets/animated_rotation_widget.dart';
 import 'package:flutter_hbb/common/widgets/custom_password.dart';
 import 'package:flutter_hbb/consts.dart';
+import 'package:flutter_hbb/common/widgets/login.dart';
 import 'package:flutter_hbb/desktop/pages/connection_page.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_setting_page.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_tab_page.dart';
@@ -53,6 +54,8 @@ class _DesktopHomePageState extends State<DesktopHomePage>
 
   final RxBool _editHover = false.obs;
   final RxBool _block = false.obs;
+  bool _forceLoginInProgress = false;
+  Worker? _loginWorker;
 
   final GlobalKey _childKey = GlobalKey();
 
@@ -749,6 +752,16 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     Get.put<RxBool>(svcStopped, tag: 'stop-service');
     rustDeskWinManager.registerActiveWindowListener(onActiveWindowChanged);
 
+    // Force login on startup and after logout
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAndForceLogin();
+    });
+    _loginWorker = ever(gFFI.userModel.userName, (name) {
+      if (name.isEmpty) {
+        _checkAndForceLogin();
+      }
+    });
+
     screenToMap(window_size.Screen screen) => {
           'frame': {
             'l': screen.frame.left,
@@ -874,8 +887,26 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     }
   }
 
+  void _checkAndForceLogin() async {
+    if (_forceLoginInProgress || gFFI.userModel.isLogin) return;
+    _forceLoginInProgress = true;
+    try {
+      while (!gFFI.userModel.isLogin) {
+        final result = await loginDialog();
+        if (result == true) {
+          await gFFI.userModel.fetchAndApplyServerConfig();
+          break;
+        }
+        await Future.delayed(const Duration(milliseconds: 300));
+      }
+    } finally {
+      _forceLoginInProgress = false;
+    }
+  }
+
   @override
   void dispose() {
+    _loginWorker?.dispose();
     _uniLinksSubscription?.cancel();
     Get.delete<RxBool>(tag: 'stop-service');
     _updateTimer?.cancel();

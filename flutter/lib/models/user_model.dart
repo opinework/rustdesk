@@ -90,6 +90,7 @@ class UserModel {
 
       final user = UserPayload.fromJson(data);
       _parseAndUpdateUser(user);
+      await fetchAndApplyServerConfig();
     } catch (e) {
       debugPrint('Failed to refreshCurrentUser: $e');
     } finally {
@@ -123,6 +124,10 @@ class UserModel {
   Future<void> reset({bool resetOther = false}) async {
     await bind.mainSetLocalOption(key: 'access_token', value: '');
     await bind.mainSetLocalOption(key: 'user_info', value: '');
+    // Clear server config on logout
+    await bind.mainSetOption(key: 'custom-rendezvous-server', value: '');
+    await bind.mainSetOption(key: 'relay-server', value: '');
+    await bind.mainSetOption(key: 'key', value: '');
     if (resetOther) {
       await gFFI.abModel.reset();
       await gFFI.groupModel.reset();
@@ -141,6 +146,47 @@ class UserModel {
     if (isWeb) {
       // ugly here, tmp solution
       bind.mainSetLocalOption(key: 'verifier', value: user.verifier ?? '');
+    }
+  }
+
+  Future<void> fetchAndApplyServerConfig() async {
+    try {
+      final url = await bind.mainGetApiServer();
+      final token = bind.mainGetLocalOption(key: 'access_token');
+      if (url.isEmpty || token.isEmpty) return;
+
+      final resp = await http.get(
+        Uri.parse('$url/api/server-config'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      if (resp.statusCode == 401 || resp.statusCode == 403) {
+        debugPrint('Server config auth failed: ${resp.statusCode}');
+        return;
+      }
+      if (resp.statusCode != 200) {
+        debugPrint('Server config request failed: ${resp.statusCode}');
+        return;
+      }
+
+      final data = json.decode(decode_http_response(resp));
+      final idServer = (data['id-server'] ?? '').toString();
+      final relayServer = (data['relay-server'] ?? '').toString();
+      final key = (data['key'] ?? '').toString();
+
+      if (idServer.isNotEmpty) {
+        await bind.mainSetOption(
+            key: 'custom-rendezvous-server', value: idServer);
+      }
+      if (relayServer.isNotEmpty) {
+        await bind.mainSetOption(key: 'relay-server', value: relayServer);
+      }
+      if (key.isNotEmpty) {
+        await bind.mainSetOption(key: 'key', value: key);
+      }
+      debugPrint(
+          'Server config applied: id=$idServer, relay=$relayServer, key=${key.isNotEmpty ? "(set)" : "(empty)"}');
+    } catch (e) {
+      debugPrint('Failed to fetch server config: $e');
     }
   }
 

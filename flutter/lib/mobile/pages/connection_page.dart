@@ -11,6 +11,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_hbb/models/peer_model.dart';
 
 import '../../common.dart';
+import '../../common/widgets/login.dart';
 import '../../common/widgets/peer_tab_page.dart';
 import '../../common/widgets/autocomplete.dart';
 import '../../consts.dart';
@@ -47,6 +48,8 @@ class _ConnectionPageState extends State<ConnectionPage> {
   final AllPeersLoader _allPeersLoader = AllPeersLoader();
 
   StreamSubscription? _uniLinksSubscription;
+  bool _forceLoginInProgress = false;
+  Worker? _loginWorker;
 
   // https://github.com/flutter/flutter/issues/157244
   Iterable<Peer> _autocompleteOpts = [];
@@ -75,6 +78,33 @@ class _ConnectionPageState extends State<ConnectionPage> {
       });
     }
     Get.put<TextEditingController>(_idEditingController);
+
+    // Force login on startup and after logout
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAndForceLogin();
+    });
+    _loginWorker = ever(gFFI.userModel.userName, (name) {
+      if (name.isEmpty) {
+        _checkAndForceLogin();
+      }
+    });
+  }
+
+  void _checkAndForceLogin() async {
+    if (_forceLoginInProgress || gFFI.userModel.isLogin) return;
+    _forceLoginInProgress = true;
+    try {
+      while (!gFFI.userModel.isLogin) {
+        final result = await loginDialog();
+        if (result == true) {
+          await gFFI.userModel.fetchAndApplyServerConfig();
+          break;
+        }
+        await Future.delayed(const Duration(milliseconds: 300));
+      }
+    } finally {
+      _forceLoginInProgress = false;
+    }
   }
 
   @override
@@ -360,6 +390,7 @@ class _ConnectionPageState extends State<ConnectionPage> {
 
   @override
   void dispose() {
+    _loginWorker?.dispose();
     _uniLinksSubscription?.cancel();
     _idController.dispose();
     _idFocusNode.removeListener(onFocusChanged);

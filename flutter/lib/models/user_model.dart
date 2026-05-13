@@ -128,6 +128,7 @@ class UserModel {
     await bind.mainSetOption(key: 'custom-rendezvous-server', value: '');
     await bind.mainSetOption(key: 'relay-server', value: '');
     await bind.mainSetOption(key: 'key', value: '');
+    await bind.mainSetOption(key: 'api-server', value: '');
     if (resetOther) {
       await gFFI.abModel.reset();
       await gFFI.groupModel.reset();
@@ -172,6 +173,7 @@ class UserModel {
       final idServer = (data['id-server'] ?? '').toString();
       final relayServer = (data['relay-server'] ?? '').toString();
       final key = (data['key'] ?? '').toString();
+      final apiServer = (data['api-server'] ?? '').toString();
 
       if (idServer.isNotEmpty) {
         await bind.mainSetOption(
@@ -183,8 +185,11 @@ class UserModel {
       if (key.isNotEmpty) {
         await bind.mainSetOption(key: 'key', value: key);
       }
+      if (apiServer.isNotEmpty) {
+        await bind.mainSetOption(key: 'api-server', value: apiServer);
+      }
       debugPrint(
-          'Server config applied: id=$idServer, relay=$relayServer, key=${key.isNotEmpty ? "(set)" : "(empty)"}');
+          'Server config applied: id=$idServer, relay=$relayServer, key=${key.isNotEmpty ? "(set)" : "(empty)"}, api=$apiServer');
     } catch (e) {
       debugPrint('Failed to fetch server config: $e');
     }

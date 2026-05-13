@@ -889,10 +889,15 @@ class _DesktopHomePageState extends State<DesktopHomePage>
 
   void _checkAndForceLogin() async {
     if (_forceLoginInProgress || gFFI.userModel.isLogin) return;
+    if (bind.isDisableAccount()) return;
+    // If a saved access_token exists, let refreshCurrentUser finish auto-login.
+    // On 401 it will call reset() which clears userName and triggers this again.
+    final token = bind.mainGetLocalOption(key: 'access_token');
+    if (token.isNotEmpty) return;
     _forceLoginInProgress = true;
     try {
       while (!gFFI.userModel.isLogin) {
-        final result = await loginDialog();
+        final result = await loginDialog(onExit: _exitApp);
         if (result == true) {
           await gFFI.userModel.fetchAndApplyServerConfig();
           break;
@@ -901,6 +906,13 @@ class _DesktopHomePageState extends State<DesktopHomePage>
       }
     } finally {
       _forceLoginInProgress = false;
+    }
+  }
+
+  void _exitApp() {
+    SystemNavigator.pop();
+    if (isWindows) {
+      exit(0);
     }
   }
 

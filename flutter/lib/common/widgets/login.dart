@@ -365,6 +365,7 @@ class LoginWidgetUserPass extends StatelessWidget {
   final RxString curOP;
   final Function() onLogin;
   final FocusNode? userFocusNode;
+  final VoidCallback? onExit;
   const LoginWidgetUserPass({
     Key? key,
     this.userFocusNode,
@@ -375,6 +376,7 @@ class LoginWidgetUserPass extends StatelessWidget {
     required this.isInProgress,
     required this.curOP,
     required this.onLogin,
+    this.onExit,
   }) : super(key: key);
 
   @override
@@ -419,6 +421,19 @@ class LoginWidgetUserPass extends StatelessWidget {
                               : null,
                     )),
               ),
+              if (onExit != null) const SizedBox(width: 12.0),
+              if (onExit != null)
+                Container(
+                  height: 38,
+                  width: 120,
+                  child: OutlinedButton(
+                    child: Text(
+                      translate('Exit'),
+                      style: TextStyle(fontSize: 16),
+                    ),
+                    onPressed: onExit,
+                  ),
+                ),
             ])),
           ],
         ));
@@ -428,7 +443,7 @@ class LoginWidgetUserPass extends StatelessWidget {
 const kAuthReqTypeOidc = 'oidc/';
 
 // call this directly
-Future<bool?> loginDialog() async {
+Future<bool?> loginDialog({VoidCallback? onExit}) async {
   var username =
       TextEditingController(text: UserModel.getLocalUserInfo()?['name'] ?? '');
   var password = TextEditingController();
@@ -643,6 +658,7 @@ Future<bool?> loginDialog() async {
             curOP: curOP,
             onLogin: onLogin,
             userFocusNode: userFocusNode,
+            onExit: onExit,
           ),
           thirdAuthWidget(),
         ],

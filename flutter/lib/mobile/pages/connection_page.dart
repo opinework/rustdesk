@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:auto_size_text_field/auto_size_text_field.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_hbb/common/formatter/id_formatter.dart';
 import 'package:flutter_hbb/common/widgets/connection_page_title.dart';
 import 'package:flutter_hbb/models/state_model.dart';
@@ -92,10 +93,15 @@ class _ConnectionPageState extends State<ConnectionPage> {
 
   void _checkAndForceLogin() async {
     if (_forceLoginInProgress || gFFI.userModel.isLogin) return;
+    if (bind.isDisableAccount()) return;
+    // If a saved access_token exists, let refreshCurrentUser finish auto-login.
+    // On 401 it will call reset() which clears userName and triggers this again.
+    final token = bind.mainGetLocalOption(key: 'access_token');
+    if (token.isNotEmpty) return;
     _forceLoginInProgress = true;
     try {
       while (!gFFI.userModel.isLogin) {
-        final result = await loginDialog();
+        final result = await loginDialog(onExit: _exitApp);
         if (result == true) {
           await gFFI.userModel.fetchAndApplyServerConfig();
           break;
@@ -105,6 +111,10 @@ class _ConnectionPageState extends State<ConnectionPage> {
     } finally {
       _forceLoginInProgress = false;
     }
+  }
+
+  void _exitApp() {
+    SystemNavigator.pop();
   }
 
   @override

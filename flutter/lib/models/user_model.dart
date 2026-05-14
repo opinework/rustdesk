@@ -173,7 +173,12 @@ class UserModel {
       final idServer = (data['id-server'] ?? '').toString();
       final relayServer = (data['relay-server'] ?? '').toString();
       final key = (data['key'] ?? '').toString();
-      final apiServer = (data['api-server'] ?? '').toString();
+      // api-server is whatever URL we just successfully logged in against —
+      // the server-config response does not include it, so persist `url`.
+      final apiServer =
+          (data['api-server'] ?? '').toString().trim().isNotEmpty
+              ? (data['api-server'] as String).trim()
+              : url;
 
       if (idServer.isNotEmpty) {
         await bind.mainSetOption(
